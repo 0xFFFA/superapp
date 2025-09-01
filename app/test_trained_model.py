@@ -11,13 +11,13 @@ from peft import PeftModel
 import json
 from pathlib import Path
 
-def load_trained_model(base_model_path, lora_adapters_path):
+def load_trained_model(base_model_path, lora_adapters_path=None):
     """
-    Загружает обученную модель с LoRA адаптерами
+    Загружает обученную модель с LoRA адаптерами или базовую модель
     
     Args:
         base_model_path: Путь к базовой модели
-        lora_adapters_path: Путь к LoRA адаптерам
+        lora_adapters_path: Путь к LoRA адаптерам (опционально)
     
     Returns:
         model, tokenizer: Загруженная модель и токенизатор
@@ -31,8 +31,14 @@ def load_trained_model(base_model_path, lora_adapters_path):
     )
     tokenizer = AutoTokenizer.from_pretrained(base_model_path)
     
-    print(f"Загружаю LoRA адаптеры из: {lora_adapters_path}")
-    model = PeftModel.from_pretrained(base_model, lora_adapters_path)
+    if lora_adapters_path and Path(lora_adapters_path).exists():
+        print(f"Загружаю LoRA адаптеры из: {lora_adapters_path}")
+        model = PeftModel.from_pretrained(base_model, lora_adapters_path)
+        print("✅ Модель с LoRA адаптерами загружена")
+    else:
+        print("⚠️ LoRA адаптеры не найдены, использую базовую модель")
+        model = base_model
+        print("✅ Базовая модель загружена")
     
     return model, tokenizer
 
@@ -51,6 +57,10 @@ def test_model(model, tokenizer, questions, max_length=200, temperature=0.7):
     print("ТЕСТИРОВАНИЕ МОДЕЛИ")
     print("="*60)
     
+    # Определяем устройство модели
+    device = next(model.parameters()).device
+    print(f"Модель находится на устройстве: {device}")
+    
     for i, question in enumerate(questions, 1):
         print(f"\n{i}. Вопрос: {question}")
         print("-" * 40)
@@ -61,6 +71,9 @@ def test_model(model, tokenizer, questions, max_length=200, temperature=0.7):
             
             # Токенизируем
             inputs = tokenizer(prompt, return_tensors="pt")
+            
+            # Перемещаем входные данные на то же устройство, что и модель
+            inputs = {k: v.to(device) for k, v in inputs.items()}
             
             # Генерируем ответ
             with torch.no_grad():
@@ -86,13 +99,15 @@ def test_model(model, tokenizer, questions, max_length=200, temperature=0.7):
             
         except Exception as e:
             print(f"Ошибка при генерации: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main():
     """Основная функция"""
     
     # Пути к моделям
-    base_model_path = "/home/dev/industrial-ai-trainer/models/qwen-2.5-3b"
-    lora_adapters_path = "./trained_model_mistral"  # Относительный путь из каталога training
+    base_model_path = "models/qwen-2.5-1.5b"  # Используем 1.5B модель для оптимального баланса
+    lora_adapters_path = "trained_model/v1"  # Путь к обученной модели
     
     # Проверяем существование путей
     if not Path(base_model_path).exists():

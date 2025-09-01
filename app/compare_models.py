@@ -36,6 +36,10 @@ def generate_answer(model, tokenizer, question, max_length=200, temperature=0.7)
     prompt = f"### Вопрос: {question}\n### Ответ:"
     inputs = tokenizer(prompt, return_tensors="pt")
     
+    # Перемещаем входные данные на то же устройство, что и модель
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
@@ -98,8 +102,8 @@ def main():
     )
     parser.add_argument(
         "--base-model", 
-        default="/home/dev/industrial-ai-trainer/models/qwen-2.5-3b",
-        help="Путь к базовой модели (по умолчанию: qwen-2.5-3b)"
+        default="models/qwen-2.5-1.5b",
+        help="Путь к базовой модели (по умолчанию: qwen-2.5-1.5b)"
     )
     parser.add_argument(
         "--trained-model", 
