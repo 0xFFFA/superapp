@@ -46,6 +46,7 @@ Thumbs.db
 
 # Project specific
 trained-models/
+trained_model/
 log/
 output/
 *.log

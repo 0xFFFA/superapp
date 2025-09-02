@@ -183,7 +183,10 @@ class IndustrialQLoRATrainer:
         # Если target_modules не указаны, определяем автоматически по типу модели
         if target_modules is None:
             logger.info("Определяю target_modules автоматически...")
-            if "llama" in self.base_model.lower():
+            if "qwen" in self.base_model.lower():
+                # Специальные модули для Qwen моделей
+                target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+            elif "llama" in self.base_model.lower():
                 target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
             elif "gpt" in self.base_model.lower():
                 target_modules = ["c_attn", "c_proj", "c_fc", "c_proj"]
@@ -210,6 +213,15 @@ class IndustrialQLoRATrainer:
         logger.info("Применяю LoRA к модели...")
         self.model = get_peft_model(self.model, lora_config)
         logger.info("LoRA применена к модели")
+        
+        # ВАЖНО: Включаем обучение для модели
+        logger.info("Включаю режим обучения...")
+        self.model.train()
+        
+        # Отключаем use_cache для совместимости с gradient checkpointing
+        if hasattr(self.model, 'config'):
+            self.model.config.use_cache = False
+            logger.info("Отключен use_cache для совместимости с gradient checkpointing")
         
         # Печатаем информацию о trainable параметрах
         logger.info("Информация о trainable параметрах:")
@@ -344,7 +356,7 @@ class IndustrialQLoRATrainer:
                 remove_unused_columns=False,
                 dataloader_pin_memory=(self.device != "cpu"),  # Отключаем pin_memory для CPU
                 dataloader_num_workers=0,  # Отключаем многопроцессорность для экономии памяти
-                gradient_checkpointing=(self.device != "cpu"),  # Отключаем gradient checkpointing для CPU
+                gradient_checkpointing=False,  # Отключаем gradient checkpointing для избежания конфликтов
             )
             logger.info("TrainingArguments созданы успешно")
         except Exception as e:
@@ -375,6 +387,20 @@ class IndustrialQLoRATrainer:
         logger.info("Начинаю обучение...")
         
         try:
+            # Дополнительная проверка модели перед обучением
+            logger.info("Проверяю настройки модели перед обучением...")
+            
+            # Убеждаемся, что модель в режиме обучения
+            self.model.train()
+            
+            # Проверяем, что есть trainable параметры
+            trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+            total_params = sum(p.numel() for p in self.model.parameters())
+            logger.info(f"Trainable параметры: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.2f}%)")
+            
+            if trainable_params == 0:
+                raise ValueError("Нет trainable параметров! Проверьте LoRA конфигурацию.")
+            
             # Запускаем обучение
             self.trainer.train()
             
