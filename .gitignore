@@ -48,7 +48,6 @@ Thumbs.db
 trained-models/
 trained_model/
 log/
-output/
 *.log
 *.err
 
