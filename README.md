@@ -13,7 +13,10 @@
 ## ✨ Ключевые возможности
 
 - 🔄 **Конвертация PDF в Q&A** - автоматическое создание датасетов из технической документации
-- 🔍 **Гибридный поиск** - комбинация ключевого и семантического поиска
+- 🔍 **Три типа поиска**:
+  - **TF-IDF** - быстрый поиск по ключевым словам
+  - **Семантический** - качественный поиск по смыслу
+  - **Гибридный** - лучший результат (TF-IDF + семантический)
 - 🤖 **RAG система** - интеллектуальные ответы на основе найденной информации
 - 🎓 **QLoRA обучение** - эффективное fine-tuning с минимальными ресурсами (исследовательский)
 - 🔄 **Продолжение обучения** - последовательное улучшение моделей на новых данных (исследовательский)
@@ -31,11 +34,17 @@ python app/pdf_to_qa.py input/your-document.pdf -o output/knowledge-base.json -q
 
 ### 2. Запуск RAG системы
 ```bash
-# Интерактивный режим
-python app/rag_system.py --mode interactive --data output/knowledge-base.json
+# TF-IDF поиск (быстрый)
+python app/rag_system.py --mode interactive --search-type tfidf --data output/knowledge-base.json
+
+# Семантический поиск (качественный)
+python app/rag_system.py --mode interactive --search-type semantic --data output/knowledge-base.json
+
+# Гибридный поиск (лучший)
+python app/rag_system.py --mode interactive --search-type hybrid --data output/knowledge-base.json
 
 # Демонстрационный режим
-python app/rag_system.py --mode demo --data output/knowledge-base.json
+python app/rag_system.py --mode demo --search-type hybrid --data output/knowledge-base.json
 
 # Список доступных баз знаний
 python app/rag_system.py --list-data
@@ -144,7 +153,8 @@ python app/pdf_to_qa.py input/book.pdf -o output/qa.json -q 20 --verbose
 python app/rag_system.py [OPTIONS]
 
 Опции:
-  --mode {interactive,demo}    Режим работы (по умолчанию: interactive)
+  --mode {interactive,demo}    Режим работы (по умолчанию: demo)
+  --search-type {tfidf,semantic,hybrid}  Тип поиска (по умолчанию: tfidf)
   --model MODEL                Модель LLM (по умолчанию: yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest)
   --data PATH                  Путь к базе знаний JSON
   --knowledge-base PATH        Альтернативное имя для --data
@@ -156,19 +166,50 @@ python app/rag_system.py [OPTIONS]
   --help                       Показать справку
 ```
 
+#### Типы поиска
+
+**1. TF-IDF поиск** (быстрый, по ключевым словам)
+```bash
+python app/rag_system.py --search-type tfidf --mode interactive --data output/knowledge-base.json
+```
+
+**2. Семантический поиск** (качественный, по смыслу)
+```bash
+python app/rag_system.py --search-type semantic --mode interactive --data output/knowledge-base.json
+```
+
+**3. Гибридный поиск** (лучший, комбинация TF-IDF + семантический)
+```bash
+python app/rag_system.py --search-type hybrid --mode interactive --data output/knowledge-base.json
+```
+
 #### Режимы работы
 
-**1. Интерактивный режим**
+**1. Интерактивный режим** (задавание вопросов в реальном времени)
 ```bash
-python app/rag_system.py --mode interactive --data output/knowledge-base.json
+# TF-IDF поиск
+python app/rag_system.py --mode interactive --search-type tfidf --data output/knowledge-base.json
+
+# Семантический поиск
+python app/rag_system.py --mode interactive --search-type semantic --data output/knowledge-base.json
+
+# Гибридный поиск
+python app/rag_system.py --mode interactive --search-type hybrid --data output/knowledge-base.json
 ```
 - Позволяет задавать вопросы в реальном времени
 - Показывает найденные релевантные документы
 - Генерирует ответы с помощью LLM
 
-**2. Демонстрационный режим**
+**2. Демонстрационный режим** (тестирование с предустановленными вопросами)
 ```bash
-python app/rag_system.py --mode demo --data output/knowledge-base.json
+# TF-IDF поиск
+python app/rag_system.py --mode demo --search-type tfidf --data output/knowledge-base.json
+
+# Семантический поиск
+python app/rag_system.py --mode demo --search-type semantic --data output/knowledge-base.json
+
+# Гибридный поиск
+python app/rag_system.py --mode demo --search-type hybrid --data output/knowledge-base.json
 ```
 - Запускает предустановленные тестовые вопросы
 - Показывает работу всех компонентов системы
@@ -427,16 +468,36 @@ python app/pdf_to_qa.py input/technical_manual.pdf \
 ```
 
 ### Запуск RAG системы
+
+#### Интерактивный режим
 ```bash
-# Интерактивный режим
-python app/rag_system.py --mode interactive --data output/mining_qa.json
+# TF-IDF поиск (быстрый)
+python app/rag_system.py --mode interactive --search-type tfidf --data output/mining_qa.json
 
-# Демонстрационный режим
-python app/rag_system.py --mode demo --data output/mining_qa.json
+# Семантический поиск (качественный)
+python app/rag_system.py --mode interactive --search-type semantic --data output/mining_qa.json
 
-# С настройками модели
+# Гибридный поиск (лучший)
+python app/rag_system.py --mode interactive --search-type hybrid --data output/mining_qa.json
+```
+
+#### Демонстрационный режим
+```bash
+# TF-IDF поиск
+python app/rag_system.py --mode demo --search-type tfidf --data output/mining_qa.json
+
+# Семантический поиск
+python app/rag_system.py --mode demo --search-type semantic --data output/mining_qa.json
+
+# Гибридный поиск
+python app/rag_system.py --mode demo --search-type hybrid --data output/mining_qa.json
+```
+
+#### С настройками модели
+```bash
 python app/rag_system.py \
     --mode interactive \
+    --search-type hybrid \
     --data output/mining_qa.json \
     --model yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest \
     --ollama-url https://193.247.73.14:11436 \

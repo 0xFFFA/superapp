@@ -715,7 +715,12 @@ if __name__ == "__main__":
     if knowledge_base_path and not os.path.isabs(knowledge_base_path):
         # Если путь относительный, делаем его абсолютным относительно output
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'output')
-        knowledge_base_path = os.path.join(output_dir, knowledge_base_path)
+        # Проверяем, не начинается ли путь уже с output/
+        if not knowledge_base_path.startswith('output/'):
+            knowledge_base_path = os.path.join(output_dir, knowledge_base_path)
+        else:
+            # Если путь уже содержит output/, используем его как есть
+            knowledge_base_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), knowledge_base_path)
     
     if args.mode == 'demo':
         demo_rag_system(knowledge_base_path, args.search_type)
