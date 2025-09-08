@@ -49,7 +49,6 @@ trained-models/
 trained_model/
 log/
 *.log
-*.err
 
 # Models (большие файлы)
 models/
