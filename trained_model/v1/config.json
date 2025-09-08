@@ -1,7 +1,0 @@
-{
-  "base_model": "models/qwen-2.5-1.5b",
-  "training_info": {
-    "method": "QLoRA",
-    "output_dir": "trained_model/v1"
-  }
-}

@@ -29,6 +29,9 @@ from datasets import Dataset
 import logging
 import psutil  # Для мониторинга памяти
 
+# Импортируем улучшенные промпт-шаблоны
+from prompt_templates import PromptTemplates, create_enhanced_training_text
+
 # Настройка CUDA для лучшего управления памятью
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
@@ -287,11 +290,11 @@ class ContinueTrainingTrainer:
             else:
                 raise ValueError("Неизвестная структура данных")
             
-            # Формируем тексты для обучения
+            # Формируем тексты для обучения с улучшенным шаблоном
             training_texts = []
             for qa in qa_pairs:
-                # Формируем промпт в формате инструкций
-                text = f"### Инструкция: Проанализируй техническую документацию и ответь на вопрос.\n\n### Вопрос: {qa['question']}\n\n### Ответ: {qa['answer']}\n\n### Конец"
+                # Используем улучшенный промпт-шаблон
+                text = create_enhanced_training_text(qa['question'], qa['answer'], "enhanced")
                 training_texts.append(text)
             
             logger.info(f"Загружено {len(training_texts)} текстов для обучения")

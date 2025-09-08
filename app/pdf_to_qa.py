@@ -2,6 +2,7 @@
 """
 PDF to Q&A Dataset Generator
 Генератор датасета вопросов-ответов из PDF файлов с использованием Ollama
+Улучшенная версия с валидацией качества данных
 """
 
 import json
@@ -19,6 +20,9 @@ except ImportError:
     print("Ошибка: Необходимо установить PyPDF2 и pdfplumber")
     print("Выполните: pip install PyPDF2 pdfplumber")
     sys.exit(1)
+
+# Импортируем улучшенные промпт-шаблоны
+from prompt_templates import PromptTemplates, validate_qa_quality
 
 
 class PDFToQAGenerator:
@@ -143,7 +147,7 @@ class PDFToQAGenerator:
     
     def _make_ollama_request(self, text_chunk: str, num_questions: int, error_log_path: str = None) -> List[Dict[str, str]]:
         """
-        Выполняет запрос к Ollama API
+        Выполняет запрос к Ollama API с улучшенным промптом
         
         Args:
             text_chunk: Текстовый блок
@@ -152,27 +156,8 @@ class PDFToQAGenerator:
         Returns:
             Список словарей с вопросами и ответами
         """
-        prompt = f"""
-ВАЖНО: Ответ должен быть ВАЛИДНЫМ JSON массивом!
-
-Создай {num_questions} качественных вопросов-ответов на основе текста.
-
-Текст:
-{text_chunk}
-
-Строго следуй этому формату (только JSON массив, без поля "questions"):
-[
-  {{"question": "Вопрос 1", "answer": "Ответ 1"}},
-  {{"question": "Вопрос 2", "answer": "Ответ 2"}},
-  {{"question": "Вопрос 3", "answer": "Ответ 3"}}
-]
-
-Создай вопросы двух типов:
-1. Вопросы на понимание (проверяют знание фактов)
-2. Аналитические вопросы (требуют размышления и анализа)
-
-ПРОВЕРЬ: JSON должен быть валидным! Только массив, ничего больше!
-"""
+        # Используем улучшенный промпт из PromptTemplates
+        prompt = PromptTemplates.get_qa_generation_prompt(text_chunk, num_questions)
         
         # Адаптивный таймаут в зависимости от размера блока и количества вопросов
         base_timeout = 120
@@ -200,7 +185,16 @@ class PDFToQAGenerator:
             
             # Пытаемся распарсить JSON
             try:
-                parsed_data = json.loads(response_text)
+                # Очищаем ответ от markdown блоков если они есть
+                cleaned_response = response_text.strip()
+                if cleaned_response.startswith('```json'):
+                    # Убираем markdown блоки
+                    cleaned_response = cleaned_response.replace('```json', '').replace('```', '').strip()
+                elif cleaned_response.startswith('```'):
+                    # Убираем общие markdown блоки
+                    cleaned_response = cleaned_response.replace('```', '').strip()
+                
+                parsed_data = json.loads(cleaned_response)
                 print(f"🔍 Тип ответа: {type(parsed_data)}")
                 
                 # Обрабатываем случай с полем "questions"
@@ -226,8 +220,19 @@ class PDFToQAGenerator:
                     isinstance(qa, dict) and 'question' in qa and 'answer' in qa 
                     for qa in qa_pairs
                 ):
-                    print(f"✅ Успешно извлечено {len(qa_pairs)} пар вопрос-ответ")
-                    return qa_pairs
+                    # Валидируем качество каждой пары вопрос-ответ
+                    validated_pairs = []
+                    for qa in qa_pairs:
+                        validation = validate_qa_quality(qa['question'], qa['answer'])
+                        if validation['passed']:
+                            validated_pairs.append(qa)
+                        else:
+                            print(f"⚠️  Пара отфильтрована (оценка {validation['quality_score']}/10): {qa['question'][:50]}...")
+                            if error_log_path:
+                                self._log_quality_issue(error_log_path, qa, validation)
+                    
+                    print(f"✅ Успешно извлечено {len(qa_pairs)} пар, {len(validated_pairs)} прошли валидацию качества")
+                    return validated_pairs
                 else:
                     print("⚠️  Неверная структура данных")
                     if error_log_path:
@@ -250,6 +255,26 @@ class PDFToQAGenerator:
         else:
             print(f"Ошибка API Ollama: {response.status_code}")
             return []
+    
+    def _log_quality_issue(self, error_log_path: str, qa_pair: Dict, validation: Dict):
+        """
+        Логирует проблемы качества данных
+        
+        Args:
+            error_log_path: Путь к файлу логов
+            qa_pair: Пара вопрос-ответ
+            validation: Результат валидации
+        """
+        try:
+            with open(error_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n{'='*50}\n")
+                f.write(f"ПРОБЛЕМА КАЧЕСТВА ДАННЫХ\n")
+                f.write(f"Оценка: {validation['quality_score']}/10\n")
+                f.write(f"Проблемы: {', '.join(validation['issues'])}\n")
+                f.write(f"Вопрос: {qa_pair['question']}\n")
+                f.write(f"Ответ: {qa_pair['answer']}\n")
+        except Exception as e:
+            print(f"Ошибка записи в лог: {e}")
     
     def process_pdf(self, pdf_path: str, output_path: str, questions_per_chunk: int = 3) -> bool:
         """

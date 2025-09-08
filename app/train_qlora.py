@@ -28,6 +28,9 @@ from datasets import Dataset
 import logging
 import psutil  # Для мониторинга памяти
 
+# Импортируем улучшенные промпт-шаблоны
+from prompt_templates import PromptTemplates, create_enhanced_training_text
+
 # Настройка CUDA для лучшего управления памятью
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
@@ -259,12 +262,12 @@ class IndustrialQLoRATrainer:
                 logger.error(f"Неизвестная структура данных. Ключи: {list(data.keys()) if isinstance(data, dict) else 'не словарь'}")
                 raise ValueError("Неизвестная структура данных")
             
-            # Формируем тексты для обучения
-            logger.info("Формирую тексты для обучения...")
+            # Формируем тексты для обучения с улучшенным шаблоном
+            logger.info("Формирую тексты для обучения с улучшенным шаблоном...")
             training_texts = []
             for i, qa in enumerate(qa_pairs):
-                # Формируем промпт в формате инструкций
-                text = f"### Инструкция: Проанализируй техническую документацию и ответь на вопрос.\n\n### Вопрос: {qa['question']}\n\n### Ответ: {qa['answer']}\n\n### Конец"
+                # Используем улучшенный промпт-шаблон
+                text = create_enhanced_training_text(qa['question'], qa['answer'], "enhanced")
                 training_texts.append(text)
                 if i % 100 == 0 and i > 0:
                     logger.info(f"Обработано {i}/{len(qa_pairs)} пар")
@@ -336,20 +339,21 @@ class IndustrialQLoRATrainer:
             raise
         
         # Настройки обучения
-        logger.info("Создаю TrainingArguments...")
+        logger.info("Создаю TrainingArguments с улучшенными параметрами...")
         try:
+            # Улучшенные параметры для лучшего качества обучения
             training_args = TrainingArguments(
                 output_dir=str(self.output_dir),
                 num_train_epochs=num_epochs,
-                per_device_train_batch_size=batch_size,
-                gradient_accumulation_steps=gradient_accumulation_steps,
-                learning_rate=learning_rate,
+                per_device_train_batch_size=max(1, batch_size // 2),  # Уменьшаем batch size для стабильности
+                gradient_accumulation_steps=gradient_accumulation_steps * 2,  # Увеличиваем accumulation
+                learning_rate=learning_rate * 0.7,  # Уменьшаем learning rate для лучшего качества
                 fp16=(self.device != "cpu"),  # Отключаем fp16 для CPU
                 logging_steps=10,
-                save_steps=100,
-                eval_steps=100,
+                save_steps=200,  # Увеличиваем интервал сохранения
+                eval_steps=200,  # Увеличиваем интервал оценки
                 save_strategy="steps",
-                warmup_steps=100,
+                warmup_steps=200,  # Увеличиваем warmup для стабильности
                 weight_decay=0.01,
                 logging_dir=str(self.output_dir / "logs"),
                 report_to=None,  # Отключаем wandb/tensorboard
@@ -357,6 +361,11 @@ class IndustrialQLoRATrainer:
                 dataloader_pin_memory=(self.device != "cpu"),  # Отключаем pin_memory для CPU
                 dataloader_num_workers=0,  # Отключаем многопроцессорность для экономии памяти
                 gradient_checkpointing=False,  # Отключаем gradient checkpointing для избежания конфликтов
+                # Дополнительные параметры для качества
+                adam_epsilon=1e-8,  # Более точный Adam
+                max_grad_norm=1.0,  # Градиентное обрезание
+                lr_scheduler_type="cosine",  # Косинусный планировщик
+                save_total_limit=3,  # Сохраняем больше чекпоинтов
             )
             logger.info("TrainingArguments созданы успешно")
         except Exception as e:
