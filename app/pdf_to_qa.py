@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import List, Dict, Optional
 import requests
 import time
+import urllib3
+
+# Подавляем предупреждения SSL
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 try:
     import PyPDF2
@@ -26,16 +30,18 @@ from prompt_templates import PromptTemplates, validate_qa_quality
 
 
 class PDFToQAGenerator:
-    def __init__(self, ollama_url: str = "http://localhost:11434", model: str = "llama3.1:8b"):
+    def __init__(self, ollama_url: str = "http://localhost:11434", model: str = "llama3.1:8b", api_token: str = None):
         """
         Инициализация генератора
         
         Args:
             ollama_url: URL для Ollama API
             model: Модель Ollama для генерации
+            api_token: Токен аутентификации для Ollama
         """
         self.ollama_url = ollama_url
         self.model = model
+        self.api_token = api_token
         self.max_chunk_size = 4000  # Максимальный размер текстового блока для Ollama
         
     def read_pdf(self, pdf_path: str) -> str:
@@ -165,8 +171,14 @@ class PDFToQAGenerator:
         questions_factor = num_questions * 15  # +15 сек на каждый вопрос
         adaptive_timeout = min(600, base_timeout + size_factor + questions_factor)
         
+        # Подготавливаем заголовки
+        headers = {}
+        if self.api_token:
+            headers['X-Access-Token'] = self.api_token
+        
         response = requests.post(
             f"{self.ollama_url}/api/generate",
+            headers=headers,
             json={
                 "model": self.model,
                 "prompt": prompt,
@@ -176,7 +188,8 @@ class PDFToQAGenerator:
                     "top_p": 0.9
                 }
             },
-            timeout=adaptive_timeout
+            timeout=adaptive_timeout,
+            verify=False  # Отключаем проверку SSL для самоподписанных сертификатов
         )
         
         if response.status_code == 200:
@@ -348,6 +361,7 @@ def main():
     parser.add_argument("-m", "--model", default="llama3.1:8b", help="Модель Ollama (по умолчанию: llama3.1:8b)")
     parser.add_argument("-q", "--questions", type=int, default=3, help="Количество вопросов на текстовый блок (по умолчанию: 3)")
     parser.add_argument("--ollama-url", default="http://localhost:11434", help="URL Ollama API (по умолчанию: http://localhost:11434)")
+    parser.add_argument("--api-token", help="Токен аутентификации для Ollama API")
     
     args = parser.parse_args()
     
@@ -373,7 +387,8 @@ def main():
     # Создаем генератор
     generator = PDFToQAGenerator(
         ollama_url=args.ollama_url,
-        model=args.model
+        model=args.model,
+        api_token=args.api_token
     )
     
     # Обрабатываем PDF
