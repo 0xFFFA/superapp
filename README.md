@@ -260,8 +260,8 @@ sudo apt upgrade
 # Установка Git
 sudo apt install git
 
-# Клонирование репозитория
-git clone https://github.com/0xFFFA/superapp.git
+# Клонирование репозитория (ветка improve-training-quality)
+git clone -b improve-training-quality https://github.com/0xFFFA/superapp.git
 cd superapp
 ```
 
